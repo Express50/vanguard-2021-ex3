@@ -1,4 +1,7 @@
-# implementation of EM factor analysis as in Ghahramani & Hinton Matlab version
+# implementation of EM factor analysis for missing data as in Roberts 2014
+
+# N = observations
+# K = size of observation
 
 import numpy as np
 
@@ -15,14 +18,15 @@ diagZZ = np.diag(ZZ)
 
 covZ = np.cov(Z.T)
 scale = np.linalg.det(covZ) ** (1 / K)
-Lambda = np.random.randn(K, P + 1) * np.math.sqrt(scale / P)
-R = np.diag(covZ)
+Lambda = np.random.randn(K, P) * np.math.sqrt(scale / P)
+Sigma = np.diag(covZ)
 
 # build Y by computing y_t = H_t*z_t for each observation t
-H = [np.identity(P)] * N # TODO: replace with real missingness structure
+H = [np.identity(K)] * N # TODO: replace with real missingness structure
 Y = []
 for t in range(N):
-    y_t = np.matmul(H[t], Z[t])
+    # y_t = np.matmul(H[t], Z[t])
+    y_t = H[t] @ Z[t]
     Y.append(y_t)
 
 Y = np.array(Y)
@@ -39,23 +43,27 @@ for i in range(iter):
     # LR_det = np.matmul(R_det, Lambda)
     # left_mat = np.matmul(LR_det, np.linalg.inv(I + np.matmul(Lambda.T, LR_det)))
     # MM = R_det - np.matmul(left_mat, LR_det.T)
-    Lambda_R = np.matmul(Lambda, np.linalg.inv(R))
-    EX = np.matmul(Lambda_R, Y - np.ones((N, 1)) * mu)
-    EXtilde = np.stack([EX, np.ones(K)])
-    EXtilde_Z = np.matmul(EXtilde, Z.T)
+    R = Lambda @ Lambda.T + np.diag(Sigma)
+    Lambda_R = Lambda.T @ np.linalg.inv(R)
+    EX = Lambda_R @ (Y - np.ones((N, 1)) * mu).T
+    EXtilde = np.vstack([EX, np.ones(N)])
+    EXtilde_Z = EXtilde @ Z
 
-    EXX = I - np.matmul(Lambda_R, Lambda)
+    EXX = I - Lambda_R @ Lambda
     # add EXX as square submatrix of EXXtilde
-    EXXtilde = np.concatenate([EXX, np.zeros(P)], axis=1)
-    EXXtilde = np.concatenate([EXXtilde, np.zeros(P+1)], axis=0)
+    EXXtilde = np.hstack([EXX, np.zeros((P, 1))])
+    EXXtilde = np.vstack([EXXtilde, np.zeros(P+1)])
     # dM = np.math.sqrt(np.linalg.det(MM))
     # beta = np.matmul(Lambda.T, MM)
     # XXbeta = np.matmul(ZZ, beta.T)
     # EZZ = I - np.matmul(beta, Lambda) + np.matmul(beta, XXbeta)
 
+    MM = np.linalg.inv(R)
+    dM = np.math.sqrt(np.linalg.det(MM))
+
     # compute LL
     old_lik = lik
-    # lik = N * const + N * np.math.log(dM) - 0.5 * N * np.sum(np.diag(np.matmul(MM, ZZ)))
+    lik = N * const + N * np.math.log(dM) - 0.5 * N * np.sum(np.diag(np.matmul(MM, ZZ)))
 
     print(f'cycle {i} lik {lik}\n')
     LL.append(lik)
