@@ -9,7 +9,7 @@ import numpy as np
 Z = np.loadtxt(open("../data/exams_imputed.csv", "rb"), delimiter=",")
 N, K = Z.shape
 P = 1
-iter = 50
+iter = 300
 tol = 10 ** -6
 
 
